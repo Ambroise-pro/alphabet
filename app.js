@@ -821,11 +821,18 @@ function renderPuzzleGame(letter) {
     screen.appendChild(board);
     screen.appendChild(tray);
 
+    function place(piece, container) {
+      const inSlot = container.classList.contains('puzzle-slot');
+      piece.style.transform = inSlot ? 'none' : `scale(${scale})`;
+      container.appendChild(piece);
+    }
+
     let finished = false;
     pieces.forEach(piece => {
       piece.addEventListener('pointerdown', e => {
-        if (finished || piece.classList.contains('locked')) return;
+        if (finished) return;
         e.preventDefault();
+        const origin = piece.parentElement;
         piece.classList.add('dragging');
         piece.style.transform = 'none';
         document.body.appendChild(piece);
@@ -844,19 +851,20 @@ function renderPuzzleGame(letter) {
             const b = s.getBoundingClientRect();
             return ev.clientX >= b.left && ev.clientX <= b.right && ev.clientY >= b.top && ev.clientY <= b.bottom;
           });
-          if (target && !target.firstChild && target.dataset.r === piece.dataset.r && target.dataset.c === piece.dataset.c) {
-            piece.classList.add('locked');
-            piece.style.transform = 'none';
-            target.appendChild(piece);
-            if (slots.every(s => s.firstChild)) {
-              finished = true;
-              playChime();
-              burstConfetti(null, true);
-              setTimeout(() => navigate(`letter/${letter}`), 1900);
-            }
+          if (!target || target === origin) {
+            place(piece, origin);
           } else {
-            piece.style.transform = `scale(${scale})`;
-            piece._home.appendChild(piece);
+            const occupant = target.firstChild;
+            if (occupant) place(occupant, origin);
+            place(piece, target);
+          }
+          const solved = slots.every(s => s.firstChild
+            && s.firstChild.dataset.r === s.dataset.r && s.firstChild.dataset.c === s.dataset.c);
+          if (solved) {
+            finished = true;
+            playChime();
+            burstConfetti(null, true);
+            setTimeout(() => navigate(`letter/${letter}`), 1900);
           }
         };
         window.addEventListener('pointermove', move);
