@@ -169,7 +169,6 @@ function render() {
   if (route === 'draw' && letter) return renderTrace(letter, true);
   if (route === 'game-draw' && letter) return renderTrace(letter, false);
   if (route === 'game-sound' && letter) return renderSoundGame(letter);
-  if (route === 'game-word' && letter) return renderWordGame(letter);
   if (route === 'game-hidden' && letter) return renderHiddenLetterGame(letter);
   if (route === 'game-puzzle' && letter) return renderPuzzleGame(letter);
   return renderHome();
@@ -326,7 +325,36 @@ function renderHome() {
     ]);
     wrap.appendChild(finale);
   }
+  wrap.appendChild(el('button', { class: 'reset-link', onclick: openResetDialog }, 'Reiniciar'));
   app.appendChild(wrap);
+}
+
+function openResetDialog() {
+  const normalize = s => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const accepted = ['reiniciar', 'reinitialiser'];
+  const input = el('input', { class: 'reset-input', type: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Escribe reiniciar' });
+  const confirm = el('button', { class: 'btn secondary', disabled: 'true' }, 'Borrar progreso');
+  const overlay = el('div', { class: 'reset-overlay' }, [
+    el('div', { class: 'reset-dialog' }, [
+      el('h2', {}, 'Reiniciar'),
+      el('p', {}, 'Se borrarán todas las letras conseguidas. Para confirmar, escribe la palabra «reiniciar».'),
+      input,
+      confirm,
+      el('button', { class: 'reset-cancel', onclick: () => overlay.remove() }, 'Cancelar')
+    ])
+  ]);
+  input.addEventListener('input', () => {
+    confirm.disabled = !accepted.includes(normalize(input.value));
+  });
+  confirm.addEventListener('click', () => {
+    if (confirm.disabled) return;
+    state.validated = [];
+    saveState(state);
+    overlay.remove();
+    render();
+  });
+  document.body.appendChild(overlay);
+  input.focus();
 }
 
 // ------- Pantalla de una letra -------
@@ -364,9 +392,6 @@ function renderLetter(letter) {
       ]),
       el('button', { class: 'game-tile', onclick: () => { navigate(`game-sound/${letter}`); } }, [
         el('span', { class: 'game-icon purple' }, icon('speaker', 28)), 'Escuchar'
-      ]),
-      el('button', { class: 'game-tile', onclick: () => { navigate(`game-word/${letter}`); } }, [
-        el('span', { class: 'game-icon green' }, icon('swap', 28)), 'Ordenar'
       ]),
       el('button', { class: 'game-tile', onclick: () => { navigate(`game-hidden/${letter}`); } }, [
         el('span', { class: 'game-icon orange' }, icon('search', 28)), 'Letra oculta'
@@ -590,102 +615,7 @@ function shuffle(arr) {
   return a;
 }
 
-// ------- Juego 3: ordenar las letras de la palabra -------
-function renderWordGame(letter) {
-  const wrap = el('div', { class: 'screen-in' });
-  wrap.appendChild(topbar(`La palabra de la ${letter}`, () => navigate(`letter/${letter}`)));
-  const screen = el('div', { class: 'screen' });
-
-  const validatedSet = new Set(LETTER_ORDER.filter(l => isValidated(l)));
-  const candidates = WORD_BANK.filter(w => [...w.word].every(ch => validatedSet.has(ch)));
-  const withLetter = candidates.filter(w => w.word.includes(letter));
-  const pool = (withLetter.length ? withLetter : candidates);
-
-  if (!pool.length) {
-    screen.appendChild(mascot('Todavía faltan algunas letras para este juego. ¡Vuelve pronto!', '🤔'));
-    wrap.appendChild(screen);
-    app.appendChild(wrap);
-    return;
-  }
-
-  const chosen = pool[Math.floor(Math.random() * pool.length)];
-  const wordLetters = [...chosen.word];
-  const tiles = shuffle(wordLetters.map((ch, i) => ({ ch, id: i, used: false })));
-  const answer = new Array(wordLetters.length).fill(null);
-
-  screen.appendChild(mascot('¡Toca las letras en el orden correcto!', '🧩'));
-  screen.appendChild(el('div', { class: 'word-emoji' }, chosen.emoji));
-
-  const slots = el('div', { class: 'word-slots' });
-  const poolRow = el('div', { class: 'tile-pool' });
-
-  function draw() {
-    slots.innerHTML = '';
-    wordLetters.forEach((_, i) => {
-      const filled = answer[i] != null;
-      const slot = el('button', { class: `word-slot ${filled ? 'filled' : ''}` }, filled ? answer[i].ch : '');
-      if (filled) {
-        slot.addEventListener('click', () => {
-          const tile = tiles.find(t => t.id === answer[i].id);
-          tile.used = false;
-          answer[i] = null;
-          draw();
-        });
-      }
-      slots.appendChild(slot);
-    });
-
-    poolRow.innerHTML = '';
-    tiles.forEach((t, i) => {
-      const btn = el('button', { class: 'letter-pill', style: `animation-delay:${i * 0.06}s` }, t.ch);
-      btn.disabled = t.used;
-      btn.addEventListener('click', () => {
-        const nextEmpty = answer.findIndex(a => a == null);
-        if (nextEmpty === -1) return;
-        answer[nextEmpty] = t;
-        t.used = true;
-        draw();
-        checkDone();
-      });
-      poolRow.appendChild(btn);
-    });
-  }
-
-  const feedback = el('div');
-
-  function checkDone() {
-    if (answer.every(a => a != null)) {
-      const built = answer.map(a => a.ch).join('');
-      feedback.innerHTML = '';
-      if (built === chosen.word) {
-        playChime();
-        burstConfetti();
-        feedback.appendChild(el('div', { class: 'celebration' }, '¡Bien hecho!'));
-        feedback.appendChild(el('button', {
-          class: 'btn green',
-          onclick: () => { navigate(`game-word/${letter}`); }
-        }, 'Otra palabra'));
-      } else {
-        feedback.appendChild(el('div', { class: 'hint-text shake' }, 'Casi, ¡inténtalo de nuevo!'));
-        setTimeout(() => {
-          answer.forEach((a, i) => { if (a) a.used = false; answer[i] = null; });
-          draw();
-          feedback.innerHTML = '';
-        }, 1200);
-      }
-    }
-  }
-
-  draw();
-  screen.appendChild(slots);
-  screen.appendChild(poolRow);
-  screen.appendChild(feedback);
-  wrap.appendChild(screen);
-  app.appendChild(wrap);
-}
-
-
-// ------- Juego 4: letra oculta -------
+// ------- Juego 3: letra oculta -------
 function renderHiddenLetterGame(letter) {
   const wrap = el('div', { class: 'screen-in' });
   wrap.appendChild(topbar(`Letra oculta`, () => navigate(`letter/${letter}`)));
@@ -760,7 +690,7 @@ function renderHiddenLetterGame(letter) {
   app.appendChild(wrap);
 }
 
-// ------- Juego 5: puzzle del animal -------
+// ------- Juego 4: puzzle del animal -------
 function renderPuzzleGame(letter) {
   const wrap = el('div', { class: 'screen-in' });
   wrap.appendChild(topbar(`Puzzle de la ${letter}`, () => navigate(`letter/${letter}`)));

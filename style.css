@@ -389,7 +389,7 @@ html, body {
 .game-grid {
   flex: 0 1 auto;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: clamp(8px, 1.8vh, 16px);
   width: 100%;
   max-width: 420px;
@@ -574,9 +574,6 @@ canvas.trace-canvas {
 
 .pin-hidden { display: none !important; }
 
-.game-grid .game-tile { grid-column: span 2; }
-.game-grid .game-tile:nth-child(4) { grid-column: 2 / span 2; }
-.game-grid .game-tile:nth-child(5) { grid-column: 4 / span 2; }
 
 /* ---------- Puzzle ---------- */
 .puzzle-board {
@@ -617,3 +614,66 @@ canvas.trace-canvas {
   cursor: grabbing;
 }
 .puzzle-piece.locked { cursor: default; border-radius: 0; box-shadow: none; }
+
+/* ---------- Reiniciar ---------- */
+.reset-link {
+  position: fixed;
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  z-index: 5;
+  border: 0;
+  background: transparent;
+  color: #A79BC9;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.reset-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(43,33,80,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.reset-dialog {
+  background: #fff;
+  border-radius: 28px;
+  padding: 24px;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+.reset-dialog h2 { margin: 0; font-size: 1.5rem; }
+.reset-dialog p { margin: 0; font-weight: 600; color: #6a5c94; }
+.reset-input {
+  font-family: inherit;
+  font-size: 1.2rem;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 3px solid var(--locked);
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+  color: var(--text);
+}
+.reset-input:focus { outline: none; border-color: var(--purple); }
+.reset-dialog .btn { max-width: none; }
+.reset-dialog .btn:disabled { opacity: 0.4; box-shadow: none; }
+.reset-cancel {
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #6a5c94;
+  padding: 8px;
+  cursor: pointer;
+}
