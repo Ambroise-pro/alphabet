@@ -380,6 +380,7 @@ html, body {
   max-width: 360px;
   transition: transform 0.1s;
 }
+.btn { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .btn:active { transform: translateY(4px) scale(0.98); box-shadow: 0 2px 0 rgba(0,0,0,0.18); }
 .btn.secondary { background: var(--pink); box-shadow: 0 6px 0 var(--pink-dark); }
 .btn.green { background: var(--green); box-shadow: 0 6px 0 var(--green-dark); }

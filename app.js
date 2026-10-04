@@ -214,6 +214,7 @@ const ICONS = {
   puzzle: '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h4a2 2 0 114 0h4v4a2 2 0 100 4v4H5z"/></g>',
   search: '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></g>',
   swap: '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/></g>',
+  eraser: '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h12M5.5 14.5l8-8a2 2 0 013 0l3 3a2 2 0 010 3l-7 7H8.5a2 2 0 01-1.4-.6l-1.6-1.6a2 2 0 010-3z"/><path d="M9 11l6 6"/></g>',
   face: '<g fill="currentColor"><circle cx="8" cy="10" r="3.2"/><circle cx="16" cy="10" r="3.2"/><path d="M12 13l-2 3h4z"/></g>'
 };
 function icon(name, size) {
@@ -424,26 +425,39 @@ function renderLetter(letter) {
 }
 
 // ------- Juego 1: trazo guiado de la letra -------
-function buildGuidePoints(letter, size) {
+function buildGuide(letter, size) {
   const off = document.createElement('canvas');
   off.width = size; off.height = size;
   const ctx = off.getContext('2d');
-  ctx.clearRect(0, 0, size, size);
   ctx.fillStyle = '#000';
   ctx.font = `bold ${Math.floor(size * 0.75)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(letter, size / 2, size / 2 + size * 0.03);
   const data = ctx.getImageData(0, 0, size, size).data;
-  const points = [];
+  const inside = (x, y) => x >= 0 && y >= 0 && x < size && y < size && data[(Math.floor(y) * size + Math.floor(x)) * 4 + 3] > 128;
+
   const step = Math.max(4, Math.floor(size / 60));
+  const run = (x, y, dx, dy) => {
+    let n = 0;
+    while (n < size && inside(x + dx * (n + 1), y + dy * (n + 1))) n++;
+    return n;
+  };
+  let points = [];
   for (let y = 0; y < size; y += step) {
     for (let x = 0; x < size; x += step) {
-      const idx = (y * size + x) * 4 + 3;
-      if (data[idx] > 128) points.push({ x, y, covered: false });
+      if (!inside(x, y)) continue;
+      const l = run(x, y, -1, 0), r = run(x, y, 1, 0), u = run(x, y, 0, -1), d = run(x, y, 0, 1);
+      const onCenter = (l + r <= u + d) ? Math.abs(l - r) <= step : Math.abs(u - d) <= step;
+      if (onCenter) points.push({ x, y, covered: false });
     }
   }
-  return points;
+  const tolerance = 9;
+  const nearLetter = (x, y) => inside(x, y)
+    || inside(x - tolerance, y) || inside(x + tolerance, y) || inside(x, y - tolerance) || inside(x, y + tolerance)
+    || inside(x - tolerance, y - tolerance) || inside(x + tolerance, y + tolerance)
+    || inside(x - tolerance, y + tolerance) || inside(x + tolerance, y - tolerance);
+  return { points, nearLetter };
 }
 
 function renderTrace(letter, isValidationFlow) {
@@ -451,7 +465,7 @@ function renderTrace(letter, isValidationFlow) {
   wrap.appendChild(topbar(isValidationFlow ? `Escribe la ${letter}` : `Dibuja la ${letter}`, () => navigate(`letter/${letter}`)));
   const screen = el('div', { class: 'screen' });
   screen.appendChild(mascot(
-    isValidationFlow ? '¡Repasa los puntitos con tu dedo mágico!' : '¡Practica escribiendo la letra, tú puedes!',
+    isValidationFlow ? 'Sigue la letra con el dedo, ¡sin salirte del dibujo!' : '¡Practica escribiendo la letra, tú puedes!',
     '✏️'
   ));
 
@@ -459,13 +473,18 @@ function renderTrace(letter, isValidationFlow) {
   const canvas = el('canvas', { class: 'trace-canvas pop-in', width: size, height: size });
   const ctx = canvas.getContext('2d');
 
-  const points = buildGuidePoints(letter, size);
-  const threshold = 0.7;
+  const { points, nearLetter } = buildGuide(letter, size);
+  const requiredCoverage = 0.9;
+  const requiredAccuracy = 0.85;
+  const coverRadius = 17;
   let drawing = false;
+  let last = null;
   let successFired = false;
-  let lastPopAt = 0;
+  let locked = false;
+  let inkTotal = 0;
+  let inkOutside = 0;
 
-  const traceColors = ['#8b5cf6', '#ff6ec7', '#ffd93c', '#2ee6a6', '#4dd0e1'];
+  const traceColors = ['#7C4DFF', '#FF5FA8', '#FFC93C', '#1FBF8F', '#3AA8FF'];
 
   function drawGuide() {
     ctx.clearRect(0, 0, size, size);
@@ -481,21 +500,32 @@ function renderTrace(letter, isValidationFlow) {
     return points.filter(p => p.covered).length / points.length;
   }
 
-  function markNear(x, y) {
-    const r2 = 22 * 22;
+  function stamp(x, y) {
+    const r2 = coverRadius * coverRadius;
     for (const p of points) {
       if (!p.covered) {
         const dx = p.x - x, dy = p.y - y;
         if (dx * dx + dy * dy < r2) p.covered = true;
       }
     }
+    inkTotal++;
+    if (!nearLetter(x, y)) inkOutside++;
   }
 
-  function paintDot(x, y) {
+  function drawSegment(from, to) {
+    ctx.strokeStyle = traceColors[Math.min(traceColors.length - 1, Math.floor(coverage() * traceColors.length))];
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.lineWidth = 20;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(x, y, 15, 0, Math.PI * 2);
-    ctx.fillStyle = traceColors[Math.floor(coverage() * (traceColors.length - 1))];
-    ctx.fill();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const steps = Math.max(1, Math.ceil(dist / 5));
+    for (let s = 1; s <= steps; s++) {
+      stamp(from.x + ((to.x - from.x) * s) / steps, from.y + ((to.y - from.y) * s) / steps);
+    }
   }
 
   const progressOuter = el('div', { class: 'progress-bar-outer' });
@@ -504,24 +534,52 @@ function renderTrace(letter, isValidationFlow) {
 
   function updateProgress() {
     const c = coverage();
-    progressInner.style.width = `${Math.round(c * 100)}%`;
-    const now = Date.now();
-    if (c > 0 && now - lastPopAt > 350 && !successFired) { lastPopAt = now; }
-    if (c >= threshold && !successFired) {
+    progressInner.style.width = `${Math.min(100, Math.round((c / requiredCoverage) * 100))}%`;
+    if (c < requiredCoverage || successFired || locked) return;
+    const accuracy = inkTotal ? 1 - inkOutside / inkTotal : 1;
+    if (accuracy >= requiredAccuracy) {
       successFired = true;
       onSuccess();
+    } else {
+      locked = true;
+      canvas.classList.add('shake');
+      setTimeout(() => { canvas.classList.remove('shake'); clearAll(); }, 700);
     }
+  }
+
+  function clearAll() {
+    points.forEach(p => { p.covered = false; });
+    inkTotal = 0;
+    inkOutside = 0;
+    successFired = false;
+    locked = false;
+    last = null;
+    drawGuide();
+    updateProgress();
   }
 
   function getPos(e) {
     const rect = canvas.getBoundingClientRect();
-    const t = e.touches ? e.touches[0] : e;
-    return { x: (t.clientX - rect.left) * (size / rect.width), y: (t.clientY - rect.top) * (size / rect.height) };
+    return { x: (e.clientX - rect.left) * (size / rect.width), y: (e.clientY - rect.top) * (size / rect.height) };
   }
 
-  function pointerDown(e) { drawing = true; const p = getPos(e); paintDot(p.x, p.y); markNear(p.x, p.y); updateProgress(); e.preventDefault(); }
-  function pointerMove(e) { if (!drawing) return; const p = getPos(e); paintDot(p.x, p.y); markNear(p.x, p.y); updateProgress(); e.preventDefault(); }
-  function pointerUp() { drawing = false; }
+  function pointerDown(e) {
+    if (locked || successFired) return;
+    drawing = true;
+    last = getPos(e);
+    drawSegment(last, last);
+    updateProgress();
+    e.preventDefault();
+  }
+  function pointerMove(e) {
+    if (!drawing || locked || successFired) return;
+    const p = getPos(e);
+    drawSegment(last, p);
+    last = p;
+    updateProgress();
+    e.preventDefault();
+  }
+  function pointerUp() { drawing = false; last = null; }
 
   canvas.addEventListener('pointerdown', pointerDown);
   canvas.addEventListener('pointermove', pointerMove);
@@ -530,21 +588,14 @@ function renderTrace(letter, isValidationFlow) {
   screen.appendChild(canvas);
   screen.appendChild(progressOuter);
 
-  const resetBtn = el('button', {
-    class: 'btn secondary', onclick: () => {
-      points.forEach(p => p.covered = false);
-      successFired = false;
-      drawGuide();
-      updateProgress();
-    }
-  }, 'Empezar de nuevo');
-  screen.appendChild(resetBtn);
+  const eraserBtn = el('button', { class: 'btn secondary', onclick: clearAll }, [icon('eraser', 26), 'Borrar todo']);
+  screen.appendChild(eraserBtn);
 
   function onSuccess() {
     if (isValidationFlow) validateLetter(letter);
     playChime();
     burstConfetti(null, true);
-    resetBtn.disabled = true;
+    eraserBtn.disabled = true;
     setTimeout(() => navigate(`letter/${letter}`), 1700);
   }
 
