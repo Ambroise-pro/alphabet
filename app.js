@@ -46,14 +46,14 @@ function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
-function playTone(freqs, dur) {
+function playTone(freqs, dur, type) {
   try {
     const ctx = getAudioCtx();
     if (ctx.state === 'suspended') ctx.resume();
     freqs.forEach((f, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = 'sine';
+      o.type = type || 'sine';
       o.frequency.value = f;
       o.connect(g);
       g.connect(ctx.destination);
@@ -66,6 +66,7 @@ function playTone(freqs, dur) {
     });
   } catch (e) {}
 }
+function playLock() { playTone([330, 150, 110], 0.06, 'triangle'); }
 function playChime() { playTone([523.25, 659.25, 783.99, 1046.5], 0.16); }
 
 function burstConfetti(originY, fullScreen) {
@@ -361,7 +362,7 @@ function renderHome() {
       class: classes.join(' '),
       style: `animation-delay:${Math.min(i * 0.03, 0.6)}s`,
       onclick: locked
-        ? (e) => shakeElement(e.currentTarget)
+        ? (e) => { playLock(); shakeElement(e.currentTarget); }
         : () => { navigate(`letter/${letter}`); }
     }, [
       tileImage(letter),
