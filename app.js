@@ -49,9 +49,7 @@ function playTone(freqs, dur) {
     });
   } catch (e) {}
 }
-function playPop() { playTone([520], 0.08); }
 function playChime() { playTone([523.25, 659.25, 783.99, 1046.5], 0.16); }
-function playOops() { playTone([260, 200], 0.14); }
 
 function burstConfetti(originY, fullScreen) {
   const canvas = document.createElement('canvas');
@@ -213,7 +211,7 @@ function icon(name, size) {
 
 function topbar(title, onBack) {
   return el('div', { class: 'topbar' }, [
-    onBack ? el('button', { class: 'icon-btn', onclick: () => { playPop(); onBack(); } }, icon('back', 22)) : el('div', { style: 'width:52px' }),
+    onBack ? el('button', { class: 'icon-btn', onclick: () => { onBack(); } }, icon('back', 22)) : el('div', { style: 'width:52px' }),
     el('h1', {}, title),
     el('div', { style: 'width:52px' })
   ]);
@@ -311,8 +309,8 @@ function renderHome() {
       class: classes.join(' '),
       style: `animation-delay:${Math.min(i * 0.03, 0.6)}s`,
       onclick: locked
-        ? (e) => { playOops(); e.currentTarget.classList.add('shake'); setTimeout(() => e.currentTarget.classList.remove('shake'), 400); }
-        : () => { playPop(); navigate(`letter/${letter}`); }
+        ? (e) => { e.currentTarget.classList.add('shake'); setTimeout(() => e.currentTarget.classList.remove('shake'), 400); }
+        : () => { navigate(`letter/${letter}`); }
     }, [
       tileImage(letter),
       validated ? el('span', { class: 'badge-icon star' }, icon('star', 16)) : (locked ? el('span', { class: 'badge-icon' }, icon('lock', 14)) : null)
@@ -356,24 +354,24 @@ function renderLetter(letter) {
     screen.appendChild(mascot('¿Ya has leído tu página? ¡Ven a ganar tu estrella!', '🦉'));
     screen.appendChild(el('button', {
       class: 'btn pulse-cta',
-      onclick: () => { playPop(); navigate(`draw/${letter}`); }
+      onclick: () => { navigate(`draw/${letter}`); }
     }, '¡He leído mi página!'));
   } else {
     screen.appendChild(mascot('¡Bravo campeón! Elige un juego divertido:', '🥳'));
     const games = el('div', { class: 'game-grid' }, [
-      el('button', { class: 'game-tile', onclick: () => { playPop(); navigate(`game-draw/${letter}`); } }, [
+      el('button', { class: 'game-tile', onclick: () => { navigate(`game-draw/${letter}`); } }, [
         el('span', { class: 'game-icon pink' }, icon('pen', 28)), 'Dibujar'
       ]),
-      el('button', { class: 'game-tile', onclick: () => { playPop(); navigate(`game-sound/${letter}`); } }, [
+      el('button', { class: 'game-tile', onclick: () => { navigate(`game-sound/${letter}`); } }, [
         el('span', { class: 'game-icon purple' }, icon('speaker', 28)), 'Escuchar'
       ]),
-      el('button', { class: 'game-tile', onclick: () => { playPop(); navigate(`game-word/${letter}`); } }, [
+      el('button', { class: 'game-tile', onclick: () => { navigate(`game-word/${letter}`); } }, [
         el('span', { class: 'game-icon green' }, icon('swap', 28)), 'Ordenar'
       ]),
-      el('button', { class: 'game-tile', onclick: () => { playPop(); navigate(`game-hidden/${letter}`); } }, [
+      el('button', { class: 'game-tile', onclick: () => { navigate(`game-hidden/${letter}`); } }, [
         el('span', { class: 'game-icon orange' }, icon('search', 28)), 'Letra oculta'
       ]),
-      el('button', { class: 'game-tile', onclick: () => { playPop(); navigate(`game-puzzle/${letter}`); } }, [
+      el('button', { class: 'game-tile', onclick: () => { navigate(`game-puzzle/${letter}`); } }, [
         el('span', { class: 'game-icon blue' }, icon('puzzle', 28)), 'Puzzle'
       ]),
     ]);
@@ -493,7 +491,6 @@ function renderTrace(letter, isValidationFlow) {
 
   const resetBtn = el('button', {
     class: 'btn secondary', onclick: () => {
-      playPop();
       points.forEach(p => p.covered = false);
       successFired = false;
       drawGuide();
@@ -556,7 +553,7 @@ function renderSoundGame(letter) {
 
     screen.appendChild(el('button', {
       class: 'btn',
-      onclick: () => { playPop(); speak(spoken); }
+      onclick: () => { speak(spoken); }
     }, 'Escuchar otra vez'));
 
     const row = el('div', { class: 'choice-row' });
@@ -570,7 +567,6 @@ function renderSoundGame(letter) {
           setTimeout(newRound, 1000);
         } else {
           btn.classList.add('wrong');
-          playOops();
           setTimeout(() => btn.classList.remove('wrong'), 500);
         }
       });
@@ -630,7 +626,6 @@ function renderWordGame(letter) {
       const slot = el('button', { class: `word-slot ${filled ? 'filled' : ''}` }, filled ? answer[i].ch : '');
       if (filled) {
         slot.addEventListener('click', () => {
-          playPop();
           const tile = tiles.find(t => t.id === answer[i].id);
           tile.used = false;
           answer[i] = null;
@@ -647,7 +642,6 @@ function renderWordGame(letter) {
       btn.addEventListener('click', () => {
         const nextEmpty = answer.findIndex(a => a == null);
         if (nextEmpty === -1) return;
-        playPop();
         answer[nextEmpty] = t;
         t.used = true;
         draw();
@@ -669,10 +663,9 @@ function renderWordGame(letter) {
         feedback.appendChild(el('div', { class: 'celebration' }, '¡Bien hecho!'));
         feedback.appendChild(el('button', {
           class: 'btn green',
-          onclick: () => { playPop(); navigate(`game-word/${letter}`); }
+          onclick: () => { navigate(`game-word/${letter}`); }
         }, 'Otra palabra'));
       } else {
-        playOops();
         feedback.appendChild(el('div', { class: 'hint-text shake' }, 'Casi, ¡inténtalo de nuevo!'));
         setTimeout(() => {
           answer.forEach((a, i) => { if (a) a.used = false; answer[i] = null; });
@@ -754,7 +747,6 @@ function renderHiddenLetterGame(letter) {
           setTimeout(newRound, 1800);
         } else {
           btn.classList.add('wrong');
-          playOops();
           setTimeout(() => btn.classList.remove('wrong'), 500);
         }
       });
@@ -837,7 +829,6 @@ function renderPuzzleGame(letter) {
       piece.addEventListener('pointerdown', e => {
         if (finished || piece.classList.contains('locked')) return;
         e.preventDefault();
-        playPop();
         piece.classList.add('dragging');
         piece.style.transform = 'none';
         document.body.appendChild(piece);
@@ -860,7 +851,6 @@ function renderPuzzleGame(letter) {
             piece.classList.add('locked');
             piece.style.transform = 'none';
             target.appendChild(piece);
-            playPop();
             if (slots.every(s => s.firstChild)) {
               finished = true;
               playChime();
@@ -870,7 +860,6 @@ function renderPuzzleGame(letter) {
           } else {
             piece.style.transform = `scale(${scale})`;
             piece._home.appendChild(piece);
-            if (target) playOops();
           }
         };
         window.addEventListener('pointermove', move);
