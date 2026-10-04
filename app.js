@@ -49,6 +49,7 @@ function getAudioCtx() {
 function playTone(freqs, dur) {
   try {
     const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
     freqs.forEach((f, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -227,7 +228,7 @@ function icon(name, size) {
 
 function topbar(title, onBack) {
   return el('div', { class: 'topbar' }, [
-    onBack ? el('button', { class: 'icon-btn', onclick: () => { onBack(); } }, icon('back', 22)) : el('div', { style: 'width:52px' }),
+    onBack ? el('button', { class: 'icon-btn', onclick: () => navigate('home') }, icon('back', 22)) : el('div', { style: 'width:52px' }),
     el('h1', {}, title),
     el('div', { style: 'width:52px' })
   ]);
@@ -283,15 +284,50 @@ function animalFrame(letter) {
   return frame;
 }
 
+let voices = [];
+function loadVoices() {
+  try { voices = speechSynthesis.getVoices(); } catch (e) {}
+}
+if ('speechSynthesis' in window) {
+  loadVoices();
+  speechSynthesis.addEventListener('voiceschanged', loadVoices);
+}
+function spanishVoice() {
+  const lang = v => (v.lang || '').replace('_', '-').toLowerCase();
+  return voices.find(v => lang(v) === 'es-es') || voices.find(v => lang(v).startsWith('es')) || null;
+}
+
+let currentUtterance = null;
 function speak(text) {
+  if (!('speechSynthesis' in window)) return;
   try {
+    if (!voices.length) loadVoices();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'es-ES';
+    const voice = spanishVoice();
+    if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'es-ES'; }
     u.rate = 0.8;
+    currentUtterance = u;
     speechSynthesis.cancel();
-    speechSynthesis.speak(u);
+    setTimeout(() => {
+      speechSynthesis.resume();
+      speechSynthesis.speak(u);
+    }, 80);
   } catch (e) {}
 }
+
+function shakeElement(node) {
+  node.animate(
+    [0, -10, 10, -8, 8, -4, 4, 0].map(x => ({ transform: `translateX(${x}px)` })),
+    { duration: 450, easing: 'ease-in-out' }
+  );
+}
+
+document.addEventListener('pointerdown', () => {
+  try { getAudioCtx().resume(); } catch (e) {}
+  if ('speechSynthesis' in window) {
+    try { speechSynthesis.resume(); } catch (e) {}
+  }
+}, { once: true });
 
 // ------- Pantalla de inicio -------
 function renderHome() {
@@ -325,7 +361,7 @@ function renderHome() {
       class: classes.join(' '),
       style: `animation-delay:${Math.min(i * 0.03, 0.6)}s`,
       onclick: locked
-        ? (e) => { const t = e.currentTarget; t.classList.add('shake'); setTimeout(() => t.classList.remove('shake'), 400); }
+        ? (e) => shakeElement(e.currentTarget)
         : () => { navigate(`letter/${letter}`); }
     }, [
       tileImage(letter),
@@ -542,8 +578,8 @@ function renderTrace(letter, isValidationFlow) {
       onSuccess();
     } else {
       locked = true;
-      canvas.classList.add('shake');
-      setTimeout(() => { canvas.classList.remove('shake'); clearAll(); }, 700);
+      shakeElement(canvas);
+      setTimeout(clearAll, 700);
     }
   }
 
