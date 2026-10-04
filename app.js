@@ -653,29 +653,30 @@ function renderTrace(letter, isValidationFlow) {
 // ------- Juego 2: reconocimiento de sonidos -------
 function renderSoundGame(letter) {
   const wrap = el('div', { class: 'screen-in' });
-  wrap.appendChild(topbar(`Escucha la ${letter}`, () => navigate(`letter/${letter}`)));
+  wrap.appendChild(topbar('Escuchar'));
   const screen = el('div', { class: 'screen' });
 
-  const isVowel = VOWELS.includes(letter);
   const vowels = ['a', 'e', 'i', 'o', 'u'];
   const validatedLetters = LETTER_ORDER.filter(l => isValidated(l));
   const consonantsValidated = validatedLetters.filter(l => !VOWELS.includes(l));
 
-  let target, spoken, options;
+  let target, isVowel, spoken, options, vowelShown;
+  let lastTarget = null;
 
   function newRound() {
+    const pool = validatedLetters.length > 1 ? validatedLetters.filter(l => l !== lastTarget) : validatedLetters;
+    target = pool[Math.floor(Math.random() * pool.length)];
+    lastTarget = target;
+    isVowel = VOWELS.includes(target);
     if (isVowel) {
-      target = letter;
-      spoken = letter.toLowerCase();
-      const pool = validatedLetters.filter(l => l !== letter);
-      options = shuffle([letter, ...shuffle(pool).slice(0, 2)]);
+      spoken = target.toLowerCase();
+      const others = validatedLetters.filter(l => l !== target);
+      options = shuffle([target, ...shuffle(others).slice(0, 2)]);
     } else {
-      target = letter;
-      const vowel = vowels[Math.floor(Math.random() * vowels.length)];
-      spoken = (letter.toLowerCase() + vowel);
-      screen._vowel = vowel;
-      const pool = consonantsValidated.filter(l => l !== letter);
-      options = shuffle([letter, ...shuffle(pool).slice(0, 2)]);
+      vowelShown = vowels[Math.floor(Math.random() * vowels.length)];
+      spoken = target.toLowerCase() + vowelShown;
+      const others = consonantsValidated.filter(l => l !== target);
+      options = shuffle([target, ...shuffle(others).slice(0, 2)]);
     }
     renderRound();
   }
@@ -687,7 +688,7 @@ function renderSoundGame(letter) {
       : '¡Escucha el sonido con la vocal y encuentra la letra correcta!', '👂'));
 
     if (!isVowel) {
-      screen.appendChild(el('div', { class: 'sound-vowel' }, screen._vowel.toUpperCase()));
+      screen.appendChild(el('div', { class: 'sound-vowel' }, vowelShown.toUpperCase()));
     }
 
     screen.appendChild(el('button', {
