@@ -189,6 +189,7 @@ function render() {
   if (route === 'game-sound' && letter) return renderSoundGame(letter);
   if (route === 'game-hidden' && letter) return renderHiddenLetterGame(letter);
   if (route === 'game-puzzle' && letter) return renderPuzzleGame(letter);
+  if (route === 'game-hunt' && letter) return renderHuntGame(letter);
   return renderHome();
 }
 
@@ -217,6 +218,7 @@ const ICONS = {
   search: '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></g>',
   swap: '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/></g>',
   eraser: '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h12M5.5 14.5l8-8a2 2 0 013 0l3 3a2 2 0 010 3l-7 7H8.5a2 2 0 01-1.4-.6l-1.6-1.6a2 2 0 010-3z"/><path d="M9 11l6 6"/></g>',
+  target: '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6"/></g>',
   face: '<g fill="currentColor"><circle cx="8" cy="10" r="3.2"/><circle cx="16" cy="10" r="3.2"/><path d="M12 13l-2 3h4z"/></g>'
 };
 function icon(name, size) {
@@ -455,7 +457,13 @@ function renderLetter(letter) {
       el('button', { class: 'game-tile', onclick: () => { navigate(`game-puzzle/${letter}`); } }, [
         el('span', { class: 'game-icon blue' }, icon('puzzle', 28)), 'Puzzle'
       ]),
+      ...(LETTER_ORDER.filter(l => isValidated(l)).length >= 2 ? [
+        el('button', { class: 'game-tile', onclick: () => { navigate(`game-hunt/${letter}`); } }, [
+          el('span', { class: 'game-icon yellow' }, icon('target', 28)), 'Caza de letras'
+        ])
+      ] : []),
     ]);
+    if (games.children.length >= 5) games.classList.add('game-grid-3');
     screen.appendChild(games);
   }
 
@@ -916,4 +924,104 @@ function renderPuzzleGame(letter) {
       });
     });
   }
+}
+
+// ------- Juego 5: caza de letras -------
+function renderHuntGame(letter) {
+  const wrap = el('div', { class: 'screen-in' });
+  wrap.appendChild(topbar('Caza de letras'));
+  const screen = el('div', { class: 'screen hunt-screen' });
+
+  const validated = LETTER_ORDER.filter(l => isValidated(l));
+  const others = validated.filter(l => l !== letter);
+  const palette = ['#7C4DFF', '#FF5FA8', '#1FBF8F', '#FF9F45', '#3AA8FF'];
+
+  const prompt = el('div', { class: 'hunt-prompt' }, [
+    el('span', {}, 'Toca todas las'),
+    el('span', { class: 'hunt-target' }, [
+      el('span', { class: 'cap' }, letter),
+      el('span', { class: 'cursive' }, letter.toLowerCase())
+    ])
+  ]);
+  const pips = el('div', { class: 'hunt-pips' });
+  const field = el('div', { class: 'hunt-field' });
+  screen.appendChild(prompt);
+  screen.appendChild(pips);
+  screen.appendChild(field);
+  wrap.appendChild(screen);
+  app.appendChild(wrap);
+
+  function makeBubble(char, cursive, isTarget, x, y, size) {
+    const b = el('button', { class: 'hunt-bubble', 'aria-label': char }, [
+      el('span', { class: cursive ? 'cursive' : 'cap' }, cursive ? char.toLowerCase() : char)
+    ]);
+    b.style.width = b.style.height = `${size}px`;
+    b.style.left = `${x}px`;
+    b.style.top = `${y}px`;
+    b.style.fontSize = `${Math.round(size * 0.56)}px`;
+    b.style.color = palette[Math.floor(Math.random() * palette.length)];
+    b.style.animationDuration = `${2.4 + Math.random() * 1.8}s`;
+    b.style.animationDelay = `-${(Math.random() * 3).toFixed(2)}s`;
+    b._isTarget = isTarget;
+    return b;
+  }
+
+  function newRound() {
+    const rect = field.getBoundingClientRect();
+    if (!rect.width || !rect.height) { setTimeout(newRound, 50); return; }
+    field.innerHTML = '';
+    const cols = rect.width >= 520 ? 4 : 3;
+    const rows = rect.height >= 400 ? 4 : 3;
+    const cellW = rect.width / cols, cellH = rect.height / rows;
+    const size = Math.max(44, Math.min(84, Math.floor(Math.min(cellW, cellH) * 0.82)));
+    const total = Math.min(cols * rows, 9);
+    const targetCount = total >= 8 ? 4 : 3;
+    const cells = shuffle([...Array(cols * rows).keys()]).slice(0, total);
+
+    const items = [];
+    const forms = shuffle([false, true, Math.random() < 0.5]);
+    if (targetCount === 4) forms.push(Math.random() < 0.5);
+    forms.forEach(cursive => items.push({ char: letter, cursive, target: true }));
+    for (let i = items.length; i < total; i++) {
+      const pool = others.length ? others : [letter];
+      const char = pool[Math.floor(Math.random() * pool.length)];
+      items.push({ char, cursive: Math.random() < 0.5, target: char === letter });
+    }
+    shuffle(items).forEach((item, i) => {
+      const cell = cells[i];
+      const cx = (cell % cols) * cellW + cellW / 2;
+      const cy = Math.floor(cell / cols) * cellH + cellH / 2;
+      const jx = (cellW - size) / 2 * 0.7, jy = (cellH - size) / 2 * 0.7;
+      const x = cx - size / 2 + (Math.random() * 2 - 1) * jx;
+      const y = cy - size / 2 + (Math.random() * 2 - 1) * jy;
+      field.appendChild(makeBubble(item.char, item.cursive, item.target, x, y, size));
+    });
+
+    const needed = items.filter(i => i.target).length;
+    let found = 0;
+    pips.innerHTML = '';
+    for (let i = 0; i < needed; i++) pips.appendChild(el('span', { class: 'hunt-pip' }));
+
+    [...field.children].forEach(b => {
+      b.addEventListener('click', () => {
+        if (b._done) return;
+        if (b._isTarget) {
+          b._done = true;
+          b.style.pointerEvents = 'none';
+          b.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: 300, fill: 'forwards' });
+          pips.children[found].classList.add('on');
+          found++;
+          if (found === needed) {
+            playChime();
+            burstConfetti(null, true);
+            setTimeout(newRound, 2000);
+          }
+        } else {
+          shakeElement(b);
+        }
+      });
+    });
+  }
+
+  setTimeout(newRound, 0);
 }
