@@ -4,9 +4,12 @@ const STORAGE_KEY = 'alphabet-progress-v1';
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const s = JSON.parse(raw);
+      return { validated: s.validated || [], updatedAt: s.updatedAt || (s.validated && s.validated.length ? 1 : 0) };
+    }
   } catch (e) {}
-  return { validated: [] };
+  return { validated: [], updatedAt: 0 };
 }
 function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -20,9 +23,22 @@ function getCurrentLetter() {
 function validateLetter(letter) {
   if (!isValidated(letter)) {
     state.validated.push(letter);
-    saveState(state);
+    touchState();
   }
 }
+
+function touchState() {
+  state.updatedAt = Date.now();
+  saveState(state);
+  if (window.cloudSync) window.cloudSync.save(state);
+}
+
+window.getLocalState = () => state;
+window.applyRemoteState = remote => {
+  state = { validated: remote.validated || [], updatedAt: remote.updatedAt || 0 };
+  saveState(state);
+  if (parseHash().route === 'home') render();
+};
 
 // ------- Pequeños efectos: sonidos y confeti -------
 let audioCtx;
@@ -308,7 +324,7 @@ function renderHome() {
       class: classes.join(' '),
       style: `animation-delay:${Math.min(i * 0.03, 0.6)}s`,
       onclick: locked
-        ? (e) => { e.currentTarget.classList.add('shake'); setTimeout(() => e.currentTarget.classList.remove('shake'), 400); }
+        ? (e) => { const t = e.currentTarget; t.classList.add('shake'); setTimeout(() => t.classList.remove('shake'), 400); }
         : () => { navigate(`letter/${letter}`); }
     }, [
       tileImage(letter),
@@ -349,7 +365,7 @@ function openResetDialog() {
   confirm.addEventListener('click', () => {
     if (confirm.disabled) return;
     state.validated = [];
-    saveState(state);
+    touchState();
     overlay.remove();
     render();
   });

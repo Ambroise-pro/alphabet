@@ -67,3 +67,26 @@ pas ajoutée, l'application affiche un emoji animal à la place, donc rien ne bl
   avec un emoji d'illustration).
 - Couleurs et style : `style.css`.
 - Textes de l'interface / de la mascotte : directement dans `app.js`.
+
+## Sauvegarde Firebase
+
+La progression est sauvegardée dans Firestore (projet `alphabet-984a7`), document `progress/main` :
+un seul enfant, partagé par tous les appareils. Le code est dans `sync.js`. La progression reste aussi
+dans le navigateur, donc l'appli marche hors-ligne et se resynchronise ensuite (la modification la
+plus récente gagne).
+
+Règles Firestore conseillées (console Firebase > Firestore > Règles), à la place du mode test qui expire :
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /progress/main {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['validated', 'updatedAt'])
+        && request.resource.data.validated is list
+        && request.resource.data.validated.size() <= 27;
+    }
+  }
+}
+```
