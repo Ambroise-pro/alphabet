@@ -1,0 +1,14 @@
+{
+  "name": "Mi Alfabeto",
+  "short_name": "Alfabeto",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFF4E0",
+  "theme_color": "#7C4DFF",
+  "lang": "es",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "assets/icons/icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "assets/icons/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
