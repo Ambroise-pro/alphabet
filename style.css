@@ -678,3 +678,9 @@ canvas.trace-canvas {
   padding: 8px;
   cursor: pointer;
 }
+
+.game-grid .game-tile:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc(50% - 8px);
+}

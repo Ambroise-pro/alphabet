@@ -447,9 +447,11 @@ function renderLetter(letter) {
       el('button', { class: 'game-tile', onclick: () => { navigate(`game-sound/${letter}`); } }, [
         el('span', { class: 'game-icon purple' }, icon('speaker', 28)), 'Escuchar'
       ]),
-      el('button', { class: 'game-tile', onclick: () => { navigate(`game-hidden/${letter}`); } }, [
-        el('span', { class: 'game-icon orange' }, icon('search', 28)), 'Letra oculta'
-      ]),
+      ...(hiddenLetterWords().length ? [
+        el('button', { class: 'game-tile', onclick: () => { navigate(`game-hidden/${letter}`); } }, [
+          el('span', { class: 'game-icon orange' }, icon('search', 28)), 'Letra oculta'
+        ])
+      ] : []),
       el('button', { class: 'game-tile', onclick: () => { navigate(`game-puzzle/${letter}`); } }, [
         el('span', { class: 'game-icon blue' }, icon('puzzle', 28)), 'Puzzle'
       ]),
@@ -720,14 +722,18 @@ function shuffle(arr) {
 }
 
 // ------- Juego 3: letra oculta -------
+function hiddenLetterWords() {
+  const validatedSet = new Set(LETTER_ORDER.filter(l => isValidated(l)));
+  return WORD_BANK.filter(w => w.word.length >= 2 && [...w.word].every(ch => validatedSet.has(ch)));
+}
+
 function renderHiddenLetterGame(letter) {
   const wrap = el('div', { class: 'screen-in' });
   wrap.appendChild(topbar(`Letra oculta`, () => navigate(`letter/${letter}`)));
   const screen = el('div', { class: 'screen' });
 
   const validatedLetters = LETTER_ORDER.filter(l => isValidated(l));
-  const validatedSet = new Set(validatedLetters);
-  const candidates = WORD_BANK.filter(w => w.word.length >= 2 && [...w.word].every(ch => validatedSet.has(ch)));
+  const candidates = hiddenLetterWords();
   const withLetter = candidates.filter(w => w.word.includes(letter));
   const pool = withLetter.length ? withLetter : candidates;
 
