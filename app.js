@@ -962,14 +962,66 @@ function renderHuntGame(letter) {
     b.style.color = palette[Math.floor(Math.random() * palette.length)];
     b.style.animationDuration = `${2.4 + Math.random() * 1.8}s`;
     b.style.animationDelay = `-${(Math.random() * 3).toFixed(2)}s`;
+    const speed = 16 + Math.random() * 14;
+    const angle = Math.random() * Math.PI * 2;
     b._isTarget = isTarget;
+    b._x = x; b._y = y; b._size = size;
+    b._vx = Math.cos(angle) * speed;
+    b._vy = Math.sin(angle) * speed;
     return b;
+  }
+
+  let roundId = 0;
+
+  function startDrifting(id) {
+    let last = performance.now();
+    function step(now) {
+      if (id !== roundId || !field.isConnected) return;
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      const w = field.clientWidth, h = field.clientHeight;
+      const active = [...field.children].filter(b => !b._done);
+      active.forEach(b => {
+        b._x += b._vx * dt;
+        b._y += b._vy * dt;
+        if (b._x < 0) { b._x = 0; b._vx = Math.abs(b._vx); }
+        if (b._x > w - b._size) { b._x = w - b._size; b._vx = -Math.abs(b._vx); }
+        if (b._y < 0) { b._y = 0; b._vy = Math.abs(b._vy); }
+        if (b._y > h - b._size) { b._y = h - b._size; b._vy = -Math.abs(b._vy); }
+      });
+      for (let i = 0; i < active.length; i++) {
+        for (let j = i + 1; j < active.length; j++) {
+          const p = active[i], q = active[j];
+          const dx = (q._x - p._x), dy = (q._y - p._y);
+          const dist = Math.hypot(dx, dy);
+          const min = (p._size + q._size) / 2;
+          if (dist > 0 && dist < min) {
+            const nx = dx / dist, ny = dy / dist;
+            const push = (min - dist) / 2;
+            p._x -= nx * push; p._y -= ny * push;
+            q._x += nx * push; q._y += ny * push;
+            const rel = (q._vx - p._vx) * nx + (q._vy - p._vy) * ny;
+            if (rel < 0) {
+              p._vx += rel * nx; p._vy += rel * ny;
+              q._vx -= rel * nx; q._vy -= rel * ny;
+            }
+          }
+        }
+      }
+      active.forEach(b => {
+        b.style.left = `${b._x}px`;
+        b.style.top = `${b._y}px`;
+      });
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }
 
   function newRound() {
     const rect = field.getBoundingClientRect();
     if (!rect.width || !rect.height) { setTimeout(newRound, 50); return; }
     field.innerHTML = '';
+    const id = ++roundId;
     const cols = rect.width >= 520 ? 4 : 3;
     const rows = rect.height >= 400 ? 4 : 3;
     const cellW = rect.width / cols, cellH = rect.height / rows;
@@ -1001,6 +1053,8 @@ function renderHuntGame(letter) {
     let found = 0;
     pips.innerHTML = '';
     for (let i = 0; i < needed; i++) pips.appendChild(el('span', { class: 'hunt-pip' }));
+
+    startDrifting(id);
 
     [...field.children].forEach(b => {
       b.addEventListener('click', () => {
