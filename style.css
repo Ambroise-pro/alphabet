@@ -93,6 +93,12 @@ html, body {
   100% { opacity: 1; transform: scale(1) rotate(0); }
 }
 
+@keyframes letterSpin {
+  0%   { opacity: 0; transform: perspective(700px) rotateY(-540deg) scale(0.3); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: perspective(700px) rotateY(0deg) scale(1); }
+}
+
 @keyframes wiggle {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(-8deg); }
@@ -326,7 +332,7 @@ html, body {
   overflow: hidden;
   box-shadow: 0 8px 0 rgba(0,0,0,0.1), 0 0 0 10px rgba(255,255,255,0.5);
   font-size: clamp(3rem, 13vh, 6.5rem);
-  animation: popIn 0.6s cubic-bezier(.34,1.56,.64,1) both;
+  animation: letterSpin 1s cubic-bezier(.25,.9,.35,1) both;
 }
 .animal-frame img {
   width: 100%;

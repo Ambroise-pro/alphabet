@@ -6,7 +6,7 @@ const CORE_ASSETS = [
   './app.js',
   './data.js',
   './manifest.json',
-  './assets/icons/icon.svg'
+  './assets/icons/icon-192.png'
 ];
 
 self.addEventListener('install', (event) => {
